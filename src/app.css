@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+:root {
+	/* Saga colors - warm, creative */
+	--saga-primary: #8b5cf6;
+	--saga-secondary: #a78bfa;
+	--saga-bg: #1e1b4b;
+
+	/* Logo colors - cool, precise */
+	--logo-primary: #06b6d4;
+	--logo-secondary: #22d3ee;
+	--logo-bg: #164e63;
+
+	/* Neutral */
+	--bg-dark: #0f0f1a;
+	--bg-card: #1a1a2e;
+	--text-primary: #f1f5f9;
+	--text-muted: #94a3b8;
+	--gold: #fbbf24;
+}
+
+body {
+	background-color: var(--bg-dark);
+	color: var(--text-primary);
+	font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Persona mode backgrounds */
+.saga-mode {
+	background: linear-gradient(135deg, var(--saga-bg) 0%, var(--bg-dark) 100%);
+}
+
+.logo-mode {
+	background: linear-gradient(135deg, var(--logo-bg) 0%, var(--bg-dark) 100%);
+}
