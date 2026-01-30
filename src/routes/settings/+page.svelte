@@ -151,5 +151,16 @@
 			<p>Your data stays on your device.</p>
 			<p class="mt-1">We don't store your API key or conversations.</p>
 		</div>
+
+		<!-- Support -->
+		<div class="mt-6 text-center">
+			<a
+				href="https://buymeacoffee.com/holdtheline"
+				target="_blank"
+				class="inline-flex items-center gap-2 px-4 py-2 bg-[var(--gold)]/10 border border-[var(--gold)]/30 rounded-lg text-[var(--gold)] hover:bg-[var(--gold)]/20 transition-colors text-sm"
+			>
+				☕ Support Saga.Logo.AI
+			</a>
+		</div>
 	</div>
 </div>

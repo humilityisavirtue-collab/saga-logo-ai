@@ -56,7 +56,12 @@
 	</main>
 
 	<!-- Footer -->
-	<footer class="py-6 text-center text-sm text-[var(--text-muted)]">
+	<footer class="py-6 text-center text-sm text-[var(--text-muted)] space-y-2">
 		<p>Built with K — the language of intent</p>
+		<p>
+			<a href="https://buymeacoffee.com/holdtheline" target="_blank" class="text-[var(--gold)] hover:underline">
+				Support the project
+			</a>
+		</p>
 	</footer>
 </div>
