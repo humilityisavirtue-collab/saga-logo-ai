@@ -11,6 +11,8 @@
 	let loading = $state(false);
 	let messages: Message[] = $state([]);
 	let apiKey = $state('');
+	let provider = $state<'anthropic' | 'openai' | 'google'>('anthropic');
+	let model = $state('');
 	let editorComponent: Editor;
 	let showEditor = $state(true);
 	let messagesContainer: HTMLElement;
@@ -29,7 +31,11 @@
 				}
 			}, 50);
 		});
-		const unsubSettings = settings.subscribe((s) => (apiKey = s.apiKey));
+		const unsubSettings = settings.subscribe((s) => {
+			apiKey = s.apiKey;
+			provider = s.apiProvider;
+			model = s.model;
+		});
 		const unsubMemory = memory.subscribe((m) => (userMemory = m));
 		return () => {
 			unsubChat();
@@ -80,7 +86,9 @@
 				body: JSON.stringify({
 					messages: [...messages, { role: 'user', content: contextMessage }],
 					persona: mode,
-					apiKey
+					apiKey,
+					provider,
+					model
 				})
 			});
 
@@ -190,7 +198,8 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					messages: messages.map((m) => ({ role: m.role, content: m.content })),
-					apiKey
+					apiKey,
+					provider
 				})
 			});
 

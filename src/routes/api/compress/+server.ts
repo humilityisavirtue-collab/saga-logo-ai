@@ -4,7 +4,7 @@ import type { RequestHandler } from './$types';
 interface CompressRequest {
 	messages: { role: string; content: string }[];
 	apiKey: string;
-	provider?: 'anthropic' | 'openai';
+	provider?: 'anthropic' | 'openai' | 'google';
 }
 
 const COMPRESS_PROMPT = `You are a memory compression system. Given a chat history, extract:
@@ -64,6 +64,26 @@ export const POST: RequestHandler = async ({ request }) => {
 
 			const data = await response.json();
 			content = data.content?.[0]?.text || '';
+		} else if (provider === 'google') {
+			const response = await fetch(
+				`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						contents: [{ role: 'user', parts: [{ text: compressMessage }] }],
+						generationConfig: { maxOutputTokens: 500 }
+					})
+				}
+			);
+
+			if (!response.ok) {
+				const errorBody = await response.text();
+				throw new Error(`Google API error: ${response.status} - ${errorBody}`);
+			}
+
+			const data = await response.json();
+			content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 		} else {
 			const response = await fetch('https://api.openai.com/v1/chat/completions', {
 				method: 'POST',

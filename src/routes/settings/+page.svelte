@@ -3,7 +3,7 @@
 	import { settings } from '$lib/stores/settings';
 
 	let apiKey = $state('');
-	let provider = $state<'anthropic' | 'openai'>('anthropic');
+	let provider = $state<'anthropic' | 'openai' | 'google'>('anthropic');
 	let model = $state('claude-sonnet-4-20250514');
 	let saved = $state(false);
 
@@ -34,6 +34,11 @@
 			{ id: 'gpt-4o', name: 'GPT-4o' },
 			{ id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
 			{ id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+		],
+		google: [
+			{ id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Free)' },
+			{ id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+			{ id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' }
 		]
 	};
 </script>
@@ -83,6 +88,17 @@
 					>
 						OpenAI
 					</button>
+					<button
+						onclick={() => {
+							provider = 'google';
+							model = models.google[0].id;
+						}}
+						class="flex-1 py-2 rounded-lg border transition-colors {provider === 'google'
+							? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
+							: 'border-white/10 text-[var(--text-muted)]'}"
+					>
+						Google
+					</button>
 				</div>
 			</div>
 
@@ -93,14 +109,16 @@
 					id="apiKey"
 					type="password"
 					bind:value={apiKey}
-					placeholder={provider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+					placeholder={provider === 'anthropic' ? 'sk-ant-...' : provider === 'openai' ? 'sk-...' : 'AIza...'}
 					class="w-full bg-[var(--bg-dark)] border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-[var(--gold)] text-[var(--text-primary)] placeholder-[var(--text-muted)]"
 				/>
 				<p class="text-xs text-[var(--text-muted)] mt-2">
 					{#if provider === 'anthropic'}
 						Get your key at <a href="https://console.anthropic.com" target="_blank" class="text-[var(--gold)] underline">console.anthropic.com</a>
-					{:else}
+					{:else if provider === 'openai'}
 						Get your key at <a href="https://platform.openai.com/api-keys" target="_blank" class="text-[var(--gold)] underline">platform.openai.com</a>
+					{:else}
+						Get your free key at <a href="https://aistudio.google.com/apikey" target="_blank" class="text-[var(--gold)] underline">aistudio.google.com</a>
 					{/if}
 				</p>
 			</div>
