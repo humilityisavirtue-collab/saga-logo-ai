@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import { Editor } from '@tiptap/core';
 	import StarterKit from '@tiptap/starter-kit';
 	import Placeholder from '@tiptap/extension-placeholder';
 
+	const STORAGE_KEY = 'saga-logo-document';
 	let element: HTMLDivElement;
 	let editor: Editor;
+	let saveTimeout: ReturnType<typeof setTimeout>;
 
 	// Expose editor content for external access
 	export function getContent(): string {
@@ -14,6 +17,26 @@
 
 	export function getText(): string {
 		return editor?.getText() || '';
+	}
+
+	export function getMarkdown(): string {
+		// Convert HTML to simple markdown
+		const html = editor?.getHTML() || '';
+		return html
+			.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
+			.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
+			.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
+			.replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
+			.replace(/<em>(.*?)<\/em>/gi, '*$1*')
+			.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '> $1\n')
+			.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+			.replace(/<ul[^>]*>|<\/ul>/gi, '\n')
+			.replace(/<hr[^>]*>/gi, '\n---\n')
+			.replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+			.replace(/<br[^>]*>/gi, '\n')
+			.replace(/<[^>]+>/g, '')
+			.replace(/\n{3,}/g, '\n\n')
+			.trim();
 	}
 
 	export function setContent(html: string) {
@@ -31,9 +54,25 @@
 
 	export function clear() {
 		editor?.commands.clearContent();
+		if (browser) localStorage.removeItem(STORAGE_KEY);
+	}
+
+	function saveToStorage() {
+		if (!browser || !editor) return;
+		const content = editor.getHTML();
+		if (content && content !== '<p></p>') {
+			localStorage.setItem(STORAGE_KEY, content);
+		}
+	}
+
+	function loadFromStorage(): string {
+		if (!browser) return '';
+		return localStorage.getItem(STORAGE_KEY) || '';
 	}
 
 	onMount(() => {
+		const savedContent = loadFromStorage();
+
 		editor = new Editor({
 			element,
 			extensions: [
@@ -46,7 +85,7 @@
 					placeholder: 'Start writing your story here...'
 				})
 			],
-			content: '',
+			content: savedContent,
 			editorProps: {
 				attributes: {
 					class: 'prose prose-invert max-w-none focus:outline-none min-h-full p-4'
@@ -55,11 +94,18 @@
 			onTransaction: () => {
 				// Force reactivity
 				editor = editor;
+			},
+			onUpdate: () => {
+				// Debounced save to localStorage
+				if (saveTimeout) clearTimeout(saveTimeout);
+				saveTimeout = setTimeout(saveToStorage, 500);
 			}
 		});
 	});
 
 	onDestroy(() => {
+		if (saveTimeout) clearTimeout(saveTimeout);
+		saveToStorage();
 		editor?.destroy();
 	});
 

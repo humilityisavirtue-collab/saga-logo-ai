@@ -121,6 +121,35 @@
 		a.click();
 		URL.revokeObjectURL(url);
 	}
+
+	function exportMarkdown() {
+		const content = editorComponent?.getMarkdown() || '';
+		const blob = new Blob([content], { type: 'text/markdown' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = 'story.md';
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	let copySuccess = $state(false);
+	async function copyToClipboard() {
+		const content = editorComponent?.getText() || '';
+		try {
+			await navigator.clipboard.writeText(content);
+			copySuccess = true;
+			setTimeout(() => copySuccess = false, 2000);
+		} catch (e) {
+			console.error('Failed to copy:', e);
+		}
+	}
+
+	function clearDocument() {
+		if (confirm('Clear the document? This cannot be undone.')) {
+			editorComponent?.clear();
+		}
+	}
 </script>
 
 <div class="h-screen flex flex-col {mode === 'saga' ? 'saga-mode' : 'logo-mode'} transition-all duration-500">
@@ -150,10 +179,29 @@
 		<div class="flex items-center gap-2">
 			{#if showEditor}
 				<button
+					onclick={copyToClipboard}
+					class="text-sm px-3 py-1 rounded border border-white/20 hover:border-white/40 transition-colors"
+				>
+					{copySuccess ? 'Copied!' : 'Copy'}
+				</button>
+				<button
+					onclick={exportMarkdown}
+					class="text-sm px-3 py-1 rounded border border-white/20 hover:border-white/40 transition-colors"
+				>
+					.md
+				</button>
+				<button
 					onclick={exportText}
 					class="text-sm px-3 py-1 rounded border border-white/20 hover:border-white/40 transition-colors"
 				>
-					Export .txt
+					.txt
+				</button>
+				<button
+					onclick={clearDocument}
+					class="text-sm px-3 py-1 rounded border border-red-500/30 hover:border-red-500/60 text-red-400 transition-colors"
+					title="Clear document"
+				>
+					Clear
 				</button>
 			{/if}
 			<button
