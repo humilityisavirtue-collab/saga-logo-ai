@@ -25,6 +25,13 @@
 	},
 	"dependencies": {
 		"@supabase/supabase-js": "^2.93.3",
-		"stripe": "^20.3.0"
+		"@tiptap/core": "^3.18.0",
+		"@tiptap/extension-collaboration": "^3.18.0",
+		"@tiptap/extension-placeholder": "^3.18.0",
+		"@tiptap/pm": "^3.18.0",
+		"@tiptap/starter-kit": "^3.18.0",
+		"stripe": "^20.3.0",
+		"y-websocket": "^3.0.0",
+		"yjs": "^13.6.29"
 	}
 }
