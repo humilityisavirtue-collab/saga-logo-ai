@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { settings } from '$lib/stores/settings';
 	import { chat, type Message } from '$lib/stores/chat';
+	import { memory, type UserMemory } from '$lib/stores/memory';
 	import { PERSONAS, type PersonaMode } from '$lib/personas';
 	import Editor from '$lib/components/Editor.svelte';
 
@@ -13,6 +14,9 @@
 	let editorComponent: Editor;
 	let showEditor = $state(true);
 	let messagesContainer: HTMLElement;
+	let userMemory: UserMemory = $state({ summary: '', variables: {}, lastUpdated: 0 });
+	let showMemory = $state(false);
+	let compressing = $state(false);
 
 	// Subscribe to stores
 	$effect(() => {
@@ -26,9 +30,11 @@
 			}, 50);
 		});
 		const unsubSettings = settings.subscribe((s) => (apiKey = s.apiKey));
+		const unsubMemory = memory.subscribe((m) => (userMemory = m));
 		return () => {
 			unsubChat();
 			unsubSettings();
+			unsubMemory();
 		};
 	});
 
@@ -48,9 +54,21 @@
 
 		// Include document context if there's content in the editor
 		const docContent = editorComponent?.getText() || '';
-		const contextMessage = docContent.trim()
-			? `[Current document content for context]\n---\n${docContent.slice(0, 2000)}${docContent.length > 2000 ? '...' : ''}\n---\n\nUser message: ${userMessage}`
-			: userMessage;
+		const memoryContext = memory.getContextString(userMemory);
+
+		let contextMessage = userMessage;
+		const contextParts: string[] = [];
+
+		if (memoryContext) {
+			contextParts.push(`[Persistent Memory]\n${memoryContext}`);
+		}
+		if (docContent.trim()) {
+			contextParts.push(`[Current document]\n${docContent.slice(0, 2000)}${docContent.length > 2000 ? '...' : ''}`);
+		}
+
+		if (contextParts.length > 0) {
+			contextMessage = `${contextParts.join('\n\n---\n\n')}\n\n---\n\nUser message: ${userMessage}`;
+		}
 
 		chat.addMessage('user', userMessage);
 		chat.addMessage('assistant', '...', mode);
@@ -73,7 +91,18 @@
 			}
 
 			const data = await response.json();
-			chat.updateLastMessage(data.content);
+
+			// Parse for editor content
+			const editorDelimiter = '---EDITOR---';
+			if (data.content.includes(editorDelimiter)) {
+				const [chatContent, editorContent] = data.content.split(editorDelimiter);
+				chat.updateLastMessage(chatContent.trim());
+				if (editorContent?.trim() && editorComponent) {
+					editorComponent.appendText('\n\n' + editorContent.trim());
+				}
+			} else {
+				chat.updateLastMessage(data.content);
+			}
 		} catch (e) {
 			chat.updateLastMessage(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
 		} finally {
@@ -150,6 +179,50 @@
 			editorComponent?.clear();
 		}
 	}
+
+	async function compressSession() {
+		if (messages.length < 2 || compressing) return;
+
+		compressing = true;
+		try {
+			const response = await fetch('/api/compress', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					messages: messages.map((m) => ({ role: m.role, content: m.content })),
+					apiKey
+				})
+			});
+
+			if (!response.ok) {
+				throw new Error(await response.text());
+			}
+
+			const data = await response.json();
+			memory.setSummary(data.summary);
+
+			// Merge new variables with existing
+			for (const [key, value] of Object.entries(data.variables)) {
+				memory.setVariable(key, value as string);
+			}
+
+			// Clear chat after compression
+			chat.clear();
+
+			alert('Session compressed and saved. Chat cleared for fresh start.');
+		} catch (e) {
+			console.error('Compression failed:', e);
+			alert('Failed to compress session: ' + (e instanceof Error ? e.message : 'Unknown error'));
+		} finally {
+			compressing = false;
+		}
+	}
+
+	function clearMemory() {
+		if (confirm('Clear all memory? This removes your session history and stored variables.')) {
+			memory.clear();
+		}
+	}
 </script>
 
 <div class="h-screen flex flex-col {mode === 'saga' ? 'saga-mode' : 'logo-mode'} transition-all duration-500">
@@ -205,6 +278,13 @@
 				</button>
 			{/if}
 			<button
+				onclick={() => showMemory = !showMemory}
+				class="text-sm px-3 py-1 rounded border transition-colors {userMemory.summary || Object.keys(userMemory.variables).length ? 'border-[var(--gold)] text-[var(--gold)]' : 'border-white/20 text-[var(--text-muted)]'} hover:border-white/40"
+				title="View/manage persistent memory"
+			>
+				Memory {userMemory.summary ? '●' : ''}
+			</button>
+			<button
 				onclick={() => goto('/settings')}
 				class="text-[var(--text-muted)] hover:text-white transition-colors"
 			>
@@ -212,6 +292,56 @@
 			</button>
 		</div>
 	</header>
+
+	<!-- Memory Panel (slides down) -->
+	{#if showMemory}
+		<div class="border-b border-white/10 bg-[var(--bg-card)] p-4 space-y-3">
+			<div class="flex items-center justify-between">
+				<h3 class="text-sm font-medium text-[var(--gold)]">Persistent Memory</h3>
+				<div class="flex gap-2">
+					<button
+						onclick={compressSession}
+						disabled={messages.length < 2 || compressing}
+						class="text-xs px-2 py-1 rounded border border-[var(--gold)]/50 text-[var(--gold)] hover:border-[var(--gold)] disabled:opacity-50 transition-colors"
+					>
+						{compressing ? 'Compressing...' : 'Close & Save Session'}
+					</button>
+					<button
+						onclick={clearMemory}
+						class="text-xs px-2 py-1 rounded border border-red-500/30 text-red-400 hover:border-red-500/60 transition-colors"
+					>
+						Clear Memory
+					</button>
+				</div>
+			</div>
+
+			{#if userMemory.summary}
+				<div>
+					<p class="text-xs text-[var(--text-muted)] mb-1">Session Summary:</p>
+					<p class="text-sm text-[var(--text-primary)] bg-white/5 rounded p-2">{userMemory.summary}</p>
+				</div>
+			{/if}
+
+			{#if Object.keys(userMemory.variables).length > 0}
+				<div>
+					<p class="text-xs text-[var(--text-muted)] mb-1">Stored Variables:</p>
+					<div class="flex flex-wrap gap-2">
+						{#each Object.entries(userMemory.variables) as [key, value]}
+							<span class="text-xs bg-white/10 rounded px-2 py-1">
+								<span class="text-[var(--text-muted)]">{key}:</span> {value}
+							</span>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			{#if !userMemory.summary && Object.keys(userMemory.variables).length === 0}
+				<p class="text-sm text-[var(--text-muted)]">
+					No memory yet. Have a conversation, then click "Close & Save Session" to compress it.
+				</p>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Main split panel -->
 	<div class="flex-1 flex overflow-hidden">
