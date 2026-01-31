@@ -1,17 +1,23 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { settings } from '$lib/stores/settings';
+	import { onMount } from 'svelte';
 
 	let apiKey = $state('');
 	let provider = $state<'anthropic' | 'openai' | 'google'>('anthropic');
 	let model = $state('claude-sonnet-4-20250514');
 	let saved = $state(false);
+	let initialized = $state(false);
 
-	$effect(() => {
+	// Load settings once on mount
+	onMount(() => {
 		const unsub = settings.subscribe((s) => {
-			apiKey = s.apiKey;
-			provider = s.apiProvider;
-			model = s.model;
+			if (!initialized) {
+				apiKey = s.apiKey;
+				provider = s.apiProvider;
+				model = s.model;
+				initialized = true;
+			}
 		});
 		return unsub;
 	});
