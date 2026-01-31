@@ -27,11 +27,21 @@ function loadSettings(): Settings {
 }
 
 function createSettingsStore() {
-	const { subscribe, set, update } = writable<Settings>(loadSettings());
+	const { subscribe, set, update } = writable<Settings>(defaultSettings);
 
+	let initialized = false;
+
+	// Initialize from localStorage on client
 	if (browser) {
+		const stored = loadSettings();
+		set(stored);
+		initialized = true;
+
+		// Save to localStorage on changes
 		subscribe((value) => {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+			if (initialized) {
+				localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+			}
 		});
 	}
 
@@ -46,6 +56,12 @@ function createSettingsStore() {
 			let hasKey = false;
 			subscribe((s) => (hasKey = !!s.apiKey))();
 			return hasKey;
+		},
+		// Force reload from localStorage
+		reload: () => {
+			if (browser) {
+				set(loadSettings());
+			}
 		}
 	};
 }
