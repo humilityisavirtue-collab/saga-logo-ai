@@ -4,15 +4,22 @@ import { browser } from '$app/environment';
 const STORAGE_KEY = 'saga-logo-settings';
 
 export interface Settings {
-	apiKey: string;
+	apiKey: string; // Legacy - still used for active key
 	apiProvider: 'anthropic' | 'openai' | 'google';
 	model: string;
+	// Per-provider keys
+	anthropicKey: string;
+	openaiKey: string;
+	googleKey: string;
 }
 
 const defaultSettings: Settings = {
 	apiKey: '',
 	apiProvider: 'anthropic',
-	model: 'claude-sonnet-4-20250514'
+	model: 'claude-sonnet-4-20250514',
+	anthropicKey: '',
+	openaiKey: '',
+	googleKey: ''
 };
 
 function loadSettings(): Settings {
