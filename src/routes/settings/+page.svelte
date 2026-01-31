@@ -4,15 +4,16 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 
-	let provider = $state<'anthropic' | 'openai' | 'google'>('anthropic');
+	let provider = $state<'anthropic' | 'openai' | 'google' | 'openrouter'>('anthropic');
 	let model = $state('claude-sonnet-4-20250514');
 	let anthropicKey = $state('');
 	let openaiKey = $state('');
 	let googleKey = $state('');
+	let openrouterKey = $state('');
 	let saved = $state(false);
 
 	// Currently active settings (from store)
-	let activeProvider = $state<'anthropic' | 'openai' | 'google'>('anthropic');
+	let activeProvider = $state<'anthropic' | 'openai' | 'google' | 'openrouter'>('anthropic');
 	let activeModel = $state('');
 
 	// Load once on mount - no subscription for form values
@@ -23,6 +24,7 @@
 		anthropicKey = s.anthropicKey || s.apiKey || '';
 		openaiKey = s.openaiKey || '';
 		googleKey = s.googleKey || '';
+		openrouterKey = s.openrouterKey || '';
 		activeProvider = s.apiProvider;
 		activeModel = s.model;
 	});
@@ -31,7 +33,8 @@
 		// Get the key for the selected provider
 		const keyForProvider = provider === 'anthropic' ? anthropicKey
 			: provider === 'openai' ? openaiKey
-			: googleKey;
+			: provider === 'google' ? googleKey
+			: openrouterKey;
 
 		settings.update(s => ({
 			...s,
@@ -40,7 +43,8 @@
 			apiKey: keyForProvider,
 			anthropicKey,
 			openaiKey,
-			googleKey
+			googleKey,
+			openrouterKey
 		}));
 
 		// Update active display immediately
@@ -66,13 +70,20 @@
 			{ id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Free)' },
 			{ id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
 			{ id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' }
+		],
+		openrouter: [
+			{ id: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', name: 'Dolphin Mistral 24B (Free)' },
+			{ id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B (Free)' },
+			{ id: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash Exp (Free)' },
+			{ id: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1 (Free)' }
 		]
 	};
 
 	const providerNames = {
 		anthropic: 'Anthropic',
 		openai: 'OpenAI',
-		google: 'Google'
+		google: 'Google',
+		openrouter: 'OpenRouter'
 	};
 
 	function getModelName(modelId: string): string {
@@ -102,7 +113,7 @@
 					<p class="font-medium">{providerNames[activeProvider]} · {getModelName(activeModel)}</p>
 				</div>
 				<div class="text-2xl">
-					{activeProvider === 'anthropic' ? '🔮' : activeProvider === 'openai' ? '🤖' : '✨'}
+					{activeProvider === 'anthropic' ? '🔮' : activeProvider === 'openai' ? '🤖' : activeProvider === 'google' ? '✨' : '🌐'}
 				</div>
 			</div>
 		</div>
@@ -152,6 +163,17 @@
 							: 'border-white/10 text-[var(--text-muted)] hover:border-white/30'}"
 					>
 						✨ Google
+					</button>
+					<button
+						onclick={() => {
+							provider = 'openrouter';
+							model = models.openrouter[0].id;
+						}}
+						class="flex-1 py-3 rounded-lg border-2 transition-all font-medium {provider === 'openrouter'
+							? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
+							: 'border-white/10 text-[var(--text-muted)] hover:border-white/30'}"
+					>
+						🌐 OpenRouter
 					</button>
 				</div>
 			</div>
@@ -214,11 +236,30 @@
 					/>
 				</div>
 
+				<!-- OpenRouter -->
+				<div class="relative">
+					<div class="flex items-center gap-2 mb-1">
+						<span class="text-sm {provider === 'openrouter' ? 'text-[var(--gold)]' : 'text-[var(--text-muted)]'}">
+							🌐 OpenRouter {openrouterKey ? '✓' : ''} <span class="text-xs opacity-60">(many free models)</span>
+						</span>
+						{#if provider === 'openrouter'}
+							<span class="text-xs bg-[var(--gold)]/20 text-[var(--gold)] px-2 py-0.5 rounded">selected</span>
+						{/if}
+					</div>
+					<input
+						type="password"
+						bind:value={openrouterKey}
+						placeholder="sk-or-..."
+						class="w-full bg-[var(--bg-dark)] border rounded-lg px-4 py-2 focus:outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)] text-sm {provider === 'openrouter' ? 'border-[var(--gold)]/50 focus:border-[var(--gold)]' : 'border-white/10 focus:border-white/30'}"
+					/>
+				</div>
+
 				<p class="text-xs text-[var(--text-muted)]">
 					Get keys:
 					<a href="https://console.anthropic.com" target="_blank" class="text-[var(--gold)] hover:underline">Anthropic</a> ·
 					<a href="https://platform.openai.com/api-keys" target="_blank" class="text-[var(--gold)] hover:underline">OpenAI</a> ·
-					<a href="https://aistudio.google.com/apikey" target="_blank" class="text-[var(--gold)] hover:underline">Google (free)</a>
+					<a href="https://aistudio.google.com/apikey" target="_blank" class="text-[var(--gold)] hover:underline">Google</a> ·
+					<a href="https://openrouter.ai/keys" target="_blank" class="text-[var(--gold)] hover:underline">OpenRouter</a>
 				</p>
 			</div>
 

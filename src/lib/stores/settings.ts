@@ -5,12 +5,13 @@ const STORAGE_KEY = 'saga-logo-settings';
 
 export interface Settings {
 	apiKey: string; // Legacy - still used for active key
-	apiProvider: 'anthropic' | 'openai' | 'google';
+	apiProvider: 'anthropic' | 'openai' | 'google' | 'openrouter';
 	model: string;
 	// Per-provider keys
 	anthropicKey: string;
 	openaiKey: string;
 	googleKey: string;
+	openrouterKey: string;
 }
 
 const defaultSettings: Settings = {
@@ -19,7 +20,8 @@ const defaultSettings: Settings = {
 	model: 'claude-sonnet-4-20250514',
 	anthropicKey: '',
 	openaiKey: '',
-	googleKey: ''
+	googleKey: '',
+	openrouterKey: ''
 };
 
 function loadSettings(): Settings {
@@ -57,7 +59,7 @@ function createSettingsStore() {
 		set,
 		update,
 		setApiKey: (key: string) => update((s) => ({ ...s, apiKey: key })),
-		setProvider: (provider: 'anthropic' | 'openai' | 'google') => update((s) => ({ ...s, apiProvider: provider })),
+		setProvider: (provider: 'anthropic' | 'openai' | 'google' | 'openrouter') => update((s) => ({ ...s, apiProvider: provider })),
 		setModel: (model: string) => update((s) => ({ ...s, model })),
 		hasApiKey: () => {
 			let hasKey = false;

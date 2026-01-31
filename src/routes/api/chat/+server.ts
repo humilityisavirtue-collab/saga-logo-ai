@@ -11,7 +11,7 @@ interface ChatRequest {
 	messages: ChatMessage[];
 	persona: PersonaMode;
 	apiKey: string;
-	provider?: 'anthropic' | 'openai' | 'google';
+	provider?: 'anthropic' | 'openai' | 'google' | 'openrouter';
 	model?: string;
 }
 
@@ -37,6 +37,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			return await callAnthropic(messages, personaConfig.systemPrompt, apiKey, model);
 		} else if (provider === 'google') {
 			return await callGoogle(messages, personaConfig.systemPrompt, apiKey, model);
+		} else if (provider === 'openrouter') {
+			return await callOpenRouter(messages, personaConfig.systemPrompt, apiKey, model);
 		} else {
 			return await callOpenAI(messages, personaConfig.systemPrompt, apiKey, model);
 		}
@@ -156,6 +158,43 @@ async function callGoogle(
 
 	const data = await response.json();
 	const content = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
+
+	return json({ content });
+}
+
+async function callOpenRouter(
+	messages: ChatMessage[],
+	systemPrompt: string,
+	apiKey: string,
+	model?: string
+) {
+	const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${apiKey}`,
+			'HTTP-Referer': 'https://saga-logo-ai.vercel.app',
+			'X-Title': 'Saga.Logo.AI'
+		},
+		body: JSON.stringify({
+			model: model || 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+			messages: [
+				{ role: 'system', content: systemPrompt },
+				...messages.map((m) => ({
+					role: m.role,
+					content: m.content
+				}))
+			]
+		})
+	});
+
+	if (!response.ok) {
+		const errorBody = await response.text();
+		throw new Error(`OpenRouter API error: ${response.status} - ${errorBody}`);
+	}
+
+	const data = await response.json();
+	const content = data.choices?.[0]?.message?.content || 'No response';
 
 	return json({ content });
 }
