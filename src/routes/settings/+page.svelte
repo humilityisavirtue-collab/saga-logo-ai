@@ -59,7 +59,7 @@
 		anthropic: [
 			{ id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
 			{ id: 'claude-opus-4-20250514', name: 'Claude Opus 4' },
-			{ id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' }
+			{ id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku' }
 		],
 		openai: [
 			{ id: 'gpt-4o', name: 'GPT-4o' },
