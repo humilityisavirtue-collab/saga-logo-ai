@@ -447,12 +447,12 @@
 
 		<!-- Right: Editor -->
 		{#if showEditor}
-			<div class="w-1/2 p-4 flex flex-col">
-				<div class="flex items-center justify-between mb-2">
+			<div class="w-1/2 p-4 flex flex-col overflow-hidden">
+				<div class="flex items-center justify-between mb-2 shrink-0">
 					<h3 class="text-sm font-medium text-[var(--text-muted)]">Document</h3>
 					<span class="text-xs text-[var(--text-muted)]">Auto-saves locally</span>
 				</div>
-				<div class="flex-1">
+				<div class="flex-1 overflow-y-auto">
 					<Editor bind:this={editorComponent} />
 				</div>
 			</div>

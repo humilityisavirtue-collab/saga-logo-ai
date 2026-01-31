@@ -27,6 +27,15 @@ export const POST: RequestHandler = async ({ request }) => {
 		throw error(400, 'Messages required');
 	}
 
+	// Filter out empty messages and limit history to prevent overflow
+	const filteredMessages = messages
+		.filter((m) => m.content && m.content.trim())
+		.slice(-20); // Keep last 20 messages max
+
+	if (filteredMessages.length === 0) {
+		throw error(400, 'No valid messages');
+	}
+
 	const personaConfig = PERSONAS[persona];
 	if (!personaConfig) {
 		throw error(400, 'Invalid persona');
@@ -34,13 +43,13 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		if (provider === 'anthropic') {
-			return await callAnthropic(messages, personaConfig.systemPrompt, apiKey, model);
+			return await callAnthropic(filteredMessages, personaConfig.systemPrompt, apiKey, model);
 		} else if (provider === 'google') {
-			return await callGoogle(messages, personaConfig.systemPrompt, apiKey, model);
+			return await callGoogle(filteredMessages, personaConfig.systemPrompt, apiKey, model);
 		} else if (provider === 'openrouter') {
-			return await callOpenRouter(messages, personaConfig.systemPrompt, apiKey, model);
+			return await callOpenRouter(filteredMessages, personaConfig.systemPrompt, apiKey, model);
 		} else {
-			return await callOpenAI(messages, personaConfig.systemPrompt, apiKey, model);
+			return await callOpenAI(filteredMessages, personaConfig.systemPrompt, apiKey, model);
 		}
 	} catch (e) {
 		console.error('Chat API error:', e);
