@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { settings } from '$lib/stores/settings';
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 
 	let provider = $state<'anthropic' | 'openai' | 'google'>('anthropic');
 	let model = $state('claude-sonnet-4-20250514');
@@ -9,27 +10,21 @@
 	let openaiKey = $state('');
 	let googleKey = $state('');
 	let saved = $state(false);
-	let initialized = $state(false);
 
 	// Currently active settings (from store)
 	let activeProvider = $state<'anthropic' | 'openai' | 'google'>('anthropic');
 	let activeModel = $state('');
 
+	// Load once on mount - no subscription for form values
 	onMount(() => {
-		const unsub = settings.subscribe((s) => {
-			if (!initialized) {
-				provider = s.apiProvider;
-				model = s.model;
-				anthropicKey = s.anthropicKey || s.apiKey || '';
-				openaiKey = s.openaiKey || '';
-				googleKey = s.googleKey || '';
-				initialized = true;
-			}
-			// Always update active display
-			activeProvider = s.apiProvider;
-			activeModel = s.model;
-		});
-		return unsub;
+		const s = get(settings);
+		provider = s.apiProvider;
+		model = s.model;
+		anthropicKey = s.anthropicKey || s.apiKey || '';
+		openaiKey = s.openaiKey || '';
+		googleKey = s.googleKey || '';
+		activeProvider = s.apiProvider;
+		activeModel = s.model;
 	});
 
 	function save() {
@@ -47,6 +42,11 @@
 			openaiKey,
 			googleKey
 		}));
+
+		// Update active display immediately
+		activeProvider = provider;
+		activeModel = model;
+
 		saved = true;
 		setTimeout(() => (saved = false), 2000);
 	}
