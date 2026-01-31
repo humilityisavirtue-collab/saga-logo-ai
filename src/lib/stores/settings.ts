@@ -5,7 +5,7 @@ const STORAGE_KEY = 'saga-logo-settings';
 
 export interface Settings {
 	apiKey: string; // Legacy - still used for active key
-	apiProvider: 'anthropic' | 'openai' | 'google' | 'openrouter';
+	apiProvider: 'anthropic' | 'openai' | 'google' | 'openrouter' | 'none';
 	model: string;
 	// Per-provider keys
 	anthropicKey: string;
@@ -59,7 +59,7 @@ function createSettingsStore() {
 		set,
 		update,
 		setApiKey: (key: string) => update((s) => ({ ...s, apiKey: key })),
-		setProvider: (provider: 'anthropic' | 'openai' | 'google' | 'openrouter') => update((s) => ({ ...s, apiProvider: provider })),
+		setProvider: (provider: 'anthropic' | 'openai' | 'google' | 'openrouter' | 'none') => update((s) => ({ ...s, apiProvider: provider })),
 		setModel: (model: string) => update((s) => ({ ...s, model })),
 		hasApiKey: () => {
 			let hasKey = false;

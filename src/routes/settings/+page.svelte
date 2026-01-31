@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 
-	let provider = $state<'anthropic' | 'openai' | 'google' | 'openrouter'>('anthropic');
+	let provider = $state<'anthropic' | 'openai' | 'google' | 'openrouter' | 'none'>('anthropic');
 	let model = $state('claude-sonnet-4-20250514');
 	let anthropicKey = $state('');
 	let openaiKey = $state('');
@@ -13,7 +13,7 @@
 	let saved = $state(false);
 
 	// Currently active settings (from store)
-	let activeProvider = $state<'anthropic' | 'openai' | 'google' | 'openrouter'>('anthropic');
+	let activeProvider = $state<'anthropic' | 'openai' | 'google' | 'openrouter' | 'none'>('anthropic');
 	let activeModel = $state('');
 
 	// Load once on mount - no subscription for form values
@@ -76,6 +76,9 @@
 			{ id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B (Free)' },
 			{ id: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash Exp (Free)' },
 			{ id: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1 (Free)' }
+		],
+		none: [
+			{ id: 'scaffold-only', name: 'Scaffold Only (No Brain)' }
 		]
 	};
 
@@ -83,7 +86,8 @@
 		anthropic: 'Anthropic',
 		openai: 'OpenAI',
 		google: 'Google',
-		openrouter: 'OpenRouter'
+		openrouter: 'OpenRouter',
+		none: 'No Brain'
 	};
 
 	function getModelName(modelId: string): string {

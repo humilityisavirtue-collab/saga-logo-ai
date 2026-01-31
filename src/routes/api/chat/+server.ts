@@ -19,6 +19,25 @@ export const POST: RequestHandler = async ({ request }) => {
 	const body: ChatRequest = await request.json();
 	const { messages, persona, apiKey, provider = 'anthropic', model } = body;
 
+	// No-brain mode: just return what the scaffold generates without a model
+	if (provider === 'none' || !apiKey) {
+		const personaConfig = PERSONAS[persona];
+		if (!personaConfig) {
+			return json({ content: '[No persona loaded]' });
+		}
+		// Return a scaffold-only response based on persona
+		const lastMessage = messages[messages.length - 1]?.content || '';
+		const scaffoldResponse = `[SCAFFOLD ONLY - No model queried]
+
+Persona: ${personaConfig.name}
+Voice directive: ${personaConfig.systemPrompt.slice(0, 200)}...
+
+Input received: "${lastMessage.slice(0, 100)}${lastMessage.length > 100 ? '...' : ''}"
+
+[This is what the model would receive. Without a brain, there is no generation - only structure waiting to be filled.]`;
+		return json({ content: scaffoldResponse });
+	}
+
 	if (!apiKey) {
 		throw error(400, 'API key required');
 	}
