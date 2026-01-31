@@ -19,6 +19,8 @@
 	let userMemory: UserMemory = $state({ summary: '', variables: {}, lastUpdated: 0 });
 	let showMemory = $state(false);
 	let compressing = $state(false);
+	let showKeyModal = $state(false);
+	let tempKey = $state('');
 
 	// Subscribe to stores
 	$effect(() => {
@@ -50,7 +52,7 @@
 		if (!input.trim() || loading) return;
 
 		if (!apiKey) {
-			goto('/settings');
+			showKeyModal = true;
 			return;
 		}
 
@@ -230,6 +232,23 @@
 	function clearMemory() {
 		if (confirm('Clear all memory? This removes your session history and stored variables.')) {
 			memory.clear();
+		}
+	}
+
+	function saveQuickKey() {
+		if (tempKey.trim()) {
+			// Default to OpenRouter for quick setup (free tier)
+			settings.update(s => ({
+				...s,
+				apiKey: tempKey.trim(),
+				openrouterKey: tempKey.trim(),
+				apiProvider: 'openrouter',
+				model: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free'
+			}));
+			apiKey = tempKey.trim();
+			provider = 'openrouter';
+			showKeyModal = false;
+			tempKey = '';
 		}
 	}
 </script>
@@ -420,7 +439,7 @@
 				</div>
 				{#if !apiKey}
 					<p class="text-center text-xs text-[var(--gold)] mt-2">
-						<a href="/settings" class="underline">Add your API key</a> to start
+						<button onclick={() => showKeyModal = true} class="underline">Add your API key</button> to start (free)
 					</p>
 				{/if}
 			</footer>
@@ -440,3 +459,43 @@
 		{/if}
 	</div>
 </div>
+
+<!-- API Key Modal -->
+{#if showKeyModal}
+	<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+		<div class="bg-[var(--bg-card)] rounded-2xl p-6 max-w-md w-full space-y-4">
+			<h2 class="text-xl font-semibold">Quick Start</h2>
+			<p class="text-sm text-[var(--text-muted)]">
+				Get a free API key from <a href="https://openrouter.ai/keys" target="_blank" class="text-[var(--gold)] underline">OpenRouter</a> (takes 30 seconds)
+			</p>
+
+			<input
+				type="password"
+				bind:value={tempKey}
+				placeholder="sk-or-..."
+				class="w-full bg-[var(--bg-dark)] border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-[var(--gold)] text-[var(--text-primary)] placeholder-[var(--text-muted)]"
+				onkeydown={(e) => e.key === 'Enter' && saveQuickKey()}
+			/>
+
+			<div class="flex gap-2">
+				<button
+					onclick={() => showKeyModal = false}
+					class="flex-1 py-2 rounded-lg border border-white/20 text-[var(--text-muted)] hover:border-white/40 transition-colors"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={saveQuickKey}
+					disabled={!tempKey.trim()}
+					class="flex-1 py-2 rounded-lg bg-[var(--gold)] text-[var(--bg-dark)] font-medium disabled:opacity-50 transition-colors"
+				>
+					Start Free
+				</button>
+			</div>
+
+			<p class="text-xs text-[var(--text-muted)] text-center">
+				Or <a href="/settings" class="text-[var(--gold)] underline">go to settings</a> for more providers
+			</p>
+		</div>
+	</div>
+{/if}
