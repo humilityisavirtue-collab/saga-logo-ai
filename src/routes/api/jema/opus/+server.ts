@@ -11,7 +11,7 @@ import type { RequestHandler } from './$types';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { message, apiKey, history = [] } = await request.json();
+	const { message, apiKey, history = [], model } = await request.json();
 
 	if (!message) {
 		return json({ error: 'No message provided' }, { status: 400 });
@@ -27,6 +27,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			usage: { input_tokens: 0, output_tokens: 0 }
 		}, { status: 400 });
 	}
+
+	// Default to Opus for comparison, allow override for escalation
+	const selectedModel = model || 'claude-opus-4-20250514';
 
 	try {
 		// Build messages array from history
@@ -46,7 +49,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				'anthropic-version': '2023-06-01'
 			},
 			body: JSON.stringify({
-				model: 'claude-sonnet-4-20250514',
+				model: selectedModel,
 				max_tokens: 1024,
 				messages: messages
 			}),
