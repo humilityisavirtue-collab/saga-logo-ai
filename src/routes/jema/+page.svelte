@@ -16,8 +16,8 @@
 	let messagesB: Array<{role: string, content: string}> = $state([]);
 
 	// Stats
-	let statsA = $state({ cost: 0, tokens: 0, latency: 0, queries: 0 });
-	let statsB = $state({ cost: 0, tokens: 0, latency: 0, queries: 0 });
+	let statsA = $state({ cost: 0, tokens: 0, latency: 0, queries: 0, templates: 0 });
+	let statsB = $state({ cost: 0, tokens: 0, latency: 0, queries: 0, templates: 0 });
 
 	// Which side is which (randomized)
 	let localIsA = $state(Math.random() > 0.5);
@@ -115,13 +115,15 @@
 				cost: statsA.cost,
 				tokens: statsA.tokens,
 				latency: localResult.latency,
-				queries: statsA.queries + 1
+				queries: statsA.queries + 1,
+				templates: statsA.templates + (localResult.isTemplate ? 1 : 0)
 			};
 			statsB = {
 				cost: statsB.cost + opusResult.cost,
 				tokens: statsB.tokens + opusResult.tokens,
 				latency: opusResult.latency,
-				queries: statsB.queries + 1
+				queries: statsB.queries + 1,
+				templates: 0
 			};
 		} else {
 			messagesA[messagesA.length - 1] = { role: 'assistant', content: opusResult.content };
@@ -130,13 +132,15 @@
 				cost: statsA.cost + opusResult.cost,
 				tokens: statsA.tokens + opusResult.tokens,
 				latency: opusResult.latency,
-				queries: statsA.queries + 1
+				queries: statsA.queries + 1,
+				templates: 0
 			};
 			statsB = {
 				cost: statsB.cost,
 				tokens: statsB.tokens,
 				latency: localResult.latency,
-				queries: statsB.queries + 1
+				queries: statsB.queries + 1,
+				templates: statsB.templates + (localResult.isTemplate ? 1 : 0)
 			};
 		}
 
@@ -146,19 +150,29 @@
 		loading = false;
 	}
 
-	async function callLocal(message: string): Promise<{content: string, latency: number}> {
-		// Use browser-based WebLLM - runs entirely on this device
+	let lastLocalSource = $state<'template' | 'generation' | null>(null);
+	let lastRouteName = $state<string | null>(null);
+
+	async function callLocal(message: string): Promise<{content: string, latency: number, isTemplate: boolean}> {
+		// K-Stack: Route through templates FIRST, generate only if needed
 		const result = await localAI.chat(message);
 
 		if (result.success) {
+			lastLocalSource = result.source || null;
+			lastRouteName = result.routeInfo?.template?.name || null;
+
 			return {
 				content: result.content,
-				latency: result.latency || 0
+				latency: result.latency || 0,
+				isTemplate: result.source === 'template'
 			};
 		} else {
+			lastLocalSource = null;
+			lastRouteName = null;
 			return {
 				content: `[Local error: ${result.error}]`,
-				latency: 0
+				latency: 0,
+				isTemplate: false
 			};
 		}
 	}
@@ -211,10 +225,12 @@
 	function reset() {
 		messagesA = [];
 		messagesB = [];
-		statsA = { cost: 0, tokens: 0, latency: 0, queries: 0 };
-		statsB = { cost: 0, tokens: 0, latency: 0, queries: 0 };
+		statsA = { cost: 0, tokens: 0, latency: 0, queries: 0, templates: 0 };
+		statsB = { cost: 0, tokens: 0, latency: 0, queries: 0, templates: 0 };
 		localIsA = Math.random() > 0.5;
 		revealed = false;
+		lastLocalSource = null;
+		lastRouteName = null;
 	}
 
 	function formatCost(cost: number): string {
@@ -439,17 +455,29 @@
 
 			<!-- Total comparison (after reveal) -->
 			{#if revealed && (statsA.queries > 0 || statsB.queries > 0)}
-				<div class="border-t border-white/10 p-4 text-center">
+				{@const localStats = localIsA ? statsA : statsB}
+				{@const opusStats = localIsA ? statsB : statsA}
+				<div class="border-t border-white/10 p-4 text-center space-y-2">
 					<p class="text-sm text-slate-400">
 						Same conversation.
-						<span class="text-emerald-400 font-bold">Browser: $0.00</span> vs
-						<span class="text-rose-400 font-bold">Opus: ${formatCost(localIsA ? statsB.cost : statsA.cost)}</span>
+						<span class="text-emerald-400 font-bold">K-Stack: $0.00</span> vs
+						<span class="text-rose-400 font-bold">Opus: ${formatCost(opusStats.cost)}</span>
 						<span class="text-slate-500 ml-2">
-							({formatTokens(localIsA ? statsB.tokens : statsA.tokens)} tokens burned)
+							({formatTokens(opusStats.tokens)} tokens burned)
 						</span>
 					</p>
+					{#if localStats.templates > 0}
+						<p class="text-xs text-emerald-400">
+							📚 {localStats.templates}/{localStats.queries} responses from templates (zero generation!)
+						</p>
+					{/if}
+					{#if lastLocalSource && lastRouteName}
+						<p class="text-xs text-slate-500">
+							Last response: {lastLocalSource === 'template' ? `📚 Template "${lastRouteName}"` : '🤖 Generated'}
+						</p>
+					{/if}
 					<p class="text-xs text-slate-600 mt-1">
-						Local model ran entirely in your browser. Zero data sent. Zero cost.
+						K-Stack routes through curated templates first. Generation is the fallback, not the default.
 					</p>
 				</div>
 			{/if}

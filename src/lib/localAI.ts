@@ -1,9 +1,10 @@
-// Local AI service using WebLLM
-// Runs models directly in browser - no API key, no backend
+// Local AI service using K-Stack + WebLLM
+// Routes through templates FIRST, generates only if needed
 // Full proof of execution on YOUR device
 
 import { writable, get } from 'svelte/store';
 import { browser } from '$app/environment';
+import { route, type RouteResult } from './kRouter';
 
 // K-Scaffold Boot Prompt
 export const K_SCAFFOLD_BOOT = `You are a K-Stack assistant — a blend of Logo (precision) and Saga (warmth).
@@ -183,14 +184,39 @@ function createLocalAIStore() {
 			content: string;
 			error?: string;
 			latency?: number;
+			source?: 'template' | 'generation';
+			routeInfo?: RouteResult;
 		}> {
+			const start = performance.now();
+
+			// STEP 1: Route through K-Stack templates FIRST
+			const routeResult = route(userMessage);
+
+			if (routeResult.matched && routeResult.surface) {
+				// Template hit! No generation needed.
+				const latency = performance.now() - start;
+				return {
+					success: true,
+					content: routeResult.surface,
+					latency,
+					source: 'template',
+					routeInfo: routeResult
+				};
+			}
+
+			// STEP 2: No template match - fall back to WebLLM generation
 			const state = get({ subscribe });
 
 			if (!state.ready || !engine) {
-				return { success: false, content: '', error: 'Model not loaded' };
+				// Model not loaded - return helpful message
+				return {
+					success: true,
+					content: "I don't have a template for that, and the local model isn't loaded yet. Load the model to enable generation.",
+					latency: performance.now() - start,
+					source: 'template',
+					routeInfo: routeResult
+				};
 			}
-
-			const start = performance.now();
 
 			try {
 				const response = await engine.chat.completions.create({
@@ -205,7 +231,13 @@ function createLocalAIStore() {
 				const content = response.choices[0]?.message?.content || '';
 				const latency = performance.now() - start;
 
-				return { success: true, content, latency };
+				return {
+					success: true,
+					content,
+					latency,
+					source: 'generation',
+					routeInfo: routeResult
+				};
 
 			} catch (e) {
 				return { success: false, content: '', error: `Generation failed: ${e}` };
