@@ -1,16 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { settings } from '$lib/stores/settings';
+	import { localAI, LOCAL_MODELS, type LocalModelKey } from '$lib/localAI';
 
 	// State
 	let input = $state('');
 	let loading = $state(false);
-	let blindMode = $state(true);
 	let revealed = $state(false);
 	let apiKey = $state('');
 	let showKeyModal = $state(false);
 	let tempKey = $state('');
-	let demoMode = $state(false);
 
 	// Messages for each side
 	let messagesA: Array<{role: string, content: string}> = $state([]);
@@ -27,15 +26,27 @@
 	let containerA: HTMLElement;
 	let containerB: HTMLElement;
 
+	// Local AI state
+	let aiState = $state($localAI);
+	$effect(() => {
+		const unsub = localAI.subscribe(s => { aiState = s; });
+		return unsub;
+	});
+
 	// Opus pricing (per 1M tokens)
-	const OPUS_INPUT_PRICE = 15; // $15/M input
-	const OPUS_OUTPUT_PRICE = 75; // $75/M output
+	const OPUS_INPUT_PRICE = 15;
+	const OPUS_OUTPUT_PRICE = 75;
 
 	$effect(() => {
 		const unsub = settings.subscribe(s => {
 			apiKey = s.anthropicKey || s.apiKey;
 		});
 		return unsub;
+	});
+
+	onMount(async () => {
+		// Check WebGPU availability on mount
+		await localAI.checkAvailability();
 	});
 
 	function saveApiKey() {
@@ -58,12 +69,23 @@
 		}, 50);
 	}
 
+	async function loadLocalModel() {
+		await localAI.loadModel();
+	}
+
 	async function sendMessage() {
 		if (!input.trim() || loading) return;
 
+		// Need API key for Opus side
 		if (!apiKey) {
 			showKeyModal = true;
 			return;
+		}
+
+		// Need local model loaded
+		if (!aiState.ready) {
+			await loadLocalModel();
+			if (!$localAI.ready) return;
 		}
 
 		const userMessage = input.trim();
@@ -118,7 +140,6 @@
 			};
 		}
 
-		// Trigger reactivity
 		messagesA = [...messagesA];
 		messagesB = [...messagesB];
 		scrollToBottom();
@@ -126,22 +147,18 @@
 	}
 
 	async function callLocal(message: string): Promise<{content: string, latency: number}> {
-		const start = performance.now();
-		try {
-			const response = await fetch('/api/jema/local', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ message })
-			});
-			const data = await response.json();
+		// Use browser-based WebLLM - runs entirely on this device
+		const result = await localAI.chat(message);
+
+		if (result.success) {
 			return {
-				content: data.content || data.output || '[No response]',
-				latency: performance.now() - start
+				content: result.content,
+				latency: result.latency || 0
 			};
-		} catch (e) {
+		} else {
 			return {
-				content: `[Error: ${e instanceof Error ? e.message : 'Unknown'}]`,
-				latency: performance.now() - start
+				content: `[Local error: ${result.error}]`,
+				latency: 0
 			};
 		}
 	}
@@ -189,7 +206,6 @@
 
 	function reveal() {
 		revealed = true;
-		blindMode = false;
 	}
 
 	function reset() {
@@ -199,7 +215,6 @@
 		statsB = { cost: 0, tokens: 0, latency: 0, queries: 0 };
 		localIsA = Math.random() > 0.5;
 		revealed = false;
-		blindMode = true;
 	}
 
 	function formatCost(cost: number): string {
@@ -214,7 +229,7 @@
 </script>
 
 <svelte:head>
-	<title>K-Systems Demo | Jema</title>
+	<title>K-Stack Demo | Browser vs API</title>
 </svelte:head>
 
 <div class="h-screen flex flex-col bg-[#0a0a0f] text-white">
@@ -223,8 +238,11 @@
 		<div class="flex items-center gap-4">
 			<a href="/" class="text-slate-400 hover:text-white transition-colors">← Back</a>
 			<h1 class="text-xl font-bold">
-				<span class="text-emerald-400">K</span>-Systems Demo
+				<span class="text-emerald-400">K</span>-Stack Demo
 			</h1>
+			<span class="text-xs text-slate-500 hidden md:inline">
+				Browser WebLLM vs Opus API
+			</span>
 		</div>
 
 		<div class="flex items-center gap-4">
@@ -247,6 +265,54 @@
 		</div>
 	</header>
 
+	<!-- Model Status Bar -->
+	{#if !aiState.ready}
+		<div class="px-4 py-3 bg-slate-900 border-b border-white/10">
+			{#if !aiState.available}
+				<div class="flex items-center justify-between">
+					<span class="text-amber-400">⚠️ WebGPU required for local inference</span>
+					<span class="text-xs text-slate-500">Try Chrome or Edge on desktop</span>
+				</div>
+			{:else if aiState.loading}
+				<div class="space-y-2">
+					<div class="flex items-center justify-between text-sm">
+						<span class="text-emerald-400">Loading {LOCAL_MODELS[aiState.selectedModel].name}...</span>
+						<span class="text-slate-400">{aiState.progress}%</span>
+					</div>
+					<div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+						<div
+							class="h-full bg-emerald-500 transition-all duration-300"
+							style="width: {aiState.progress}%"
+						></div>
+					</div>
+					<p class="text-xs text-slate-500">{aiState.progressText}</p>
+				</div>
+			{:else}
+				<div class="flex items-center justify-between">
+					<div>
+						<span class="text-slate-400">Local model: </span>
+						<span class="text-emerald-400">{LOCAL_MODELS[aiState.selectedModel].name}</span>
+						<span class="text-slate-500 text-sm ml-2">({LOCAL_MODELS[aiState.selectedModel].size})</span>
+					</div>
+					<button
+						onclick={loadLocalModel}
+						class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-medium rounded-lg transition-colors"
+					>
+						Load Model
+					</button>
+				</div>
+			{/if}
+		</div>
+	{:else}
+		<div class="px-4 py-2 bg-emerald-500/10 border-b border-emerald-500/20">
+			<div class="flex items-center gap-2 text-sm">
+				<span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+				<span class="text-emerald-400">Local model running in your browser</span>
+				<span class="text-slate-500">— {LOCAL_MODELS[aiState.selectedModel].name}</span>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Main content -->
 	<div class="flex-1 flex flex-col overflow-hidden">
 		<!-- Chat panels -->
@@ -256,7 +322,7 @@
 				<div class="p-3 border-b border-white/10 text-center">
 					{#if revealed}
 						<span class="font-bold {localIsA ? 'text-emerald-400' : 'text-rose-400'}">
-							{localIsA ? 'LOCAL (K-Stack + Gemma)' : 'OPUS API'}
+							{localIsA ? '🖥️ BROWSER (WebLLM)' : '☁️ OPUS API'}
 						</span>
 					{:else}
 						<span class="text-slate-400 font-medium">Model A</span>
@@ -283,7 +349,7 @@
 				<div class="p-3 border-b border-white/10 text-center">
 					{#if revealed}
 						<span class="font-bold {!localIsA ? 'text-emerald-400' : 'text-rose-400'}">
-							{!localIsA ? 'LOCAL (K-Stack + Gemma)' : 'OPUS API'}
+							{!localIsA ? '🖥️ BROWSER (WebLLM)' : '☁️ OPUS API'}
 						</span>
 					{:else}
 						<span class="text-slate-400 font-medium">Model B</span>
@@ -314,11 +380,12 @@
 					onkeydown={handleKeydown}
 					placeholder="Type a message... (sent to both models)"
 					rows="2"
-					class="flex-1 bg-slate-800 border border-white/10 rounded-xl px-4 py-3 resize-none focus:outline-none focus:border-emerald-500 text-white placeholder-slate-500"
+					disabled={!aiState.ready}
+					class="flex-1 bg-slate-800 border border-white/10 rounded-xl px-4 py-3 resize-none focus:outline-none focus:border-emerald-500 text-white placeholder-slate-500 disabled:opacity-50"
 				></textarea>
 				<button
 					onclick={sendMessage}
-					disabled={loading || !input.trim()}
+					disabled={loading || !input.trim() || !aiState.ready}
 					class="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-medium rounded-xl transition-colors"
 				>
 					{loading ? '...' : 'Send'}
@@ -333,7 +400,7 @@
 				<div class="w-1/2 p-6 border-r border-white/10 text-center">
 					{#if revealed}
 						<p class="text-xs text-slate-500 mb-2 uppercase tracking-wider">
-							{localIsA ? 'Local Stack' : 'Opus API'}
+							{localIsA ? '🖥️ Browser' : '☁️ Opus API'}
 						</p>
 					{/if}
 					<div class="space-y-2">
@@ -353,7 +420,7 @@
 				<div class="w-1/2 p-6 text-center">
 					{#if revealed}
 						<p class="text-xs text-slate-500 mb-2 uppercase tracking-wider">
-							{!localIsA ? 'Local Stack' : 'Opus API'}
+							{!localIsA ? '🖥️ Browser' : '☁️ Opus API'}
 						</p>
 					{/if}
 					<div class="space-y-2">
@@ -375,11 +442,14 @@
 				<div class="border-t border-white/10 p-4 text-center">
 					<p class="text-sm text-slate-400">
 						Same conversation.
-						<span class="text-emerald-400 font-bold">Local: $0.00</span> vs
+						<span class="text-emerald-400 font-bold">Browser: $0.00</span> vs
 						<span class="text-rose-400 font-bold">Opus: ${formatCost(localIsA ? statsB.cost : statsA.cost)}</span>
 						<span class="text-slate-500 ml-2">
 							({formatTokens(localIsA ? statsB.tokens : statsA.tokens)} tokens burned)
 						</span>
+					</p>
+					<p class="text-xs text-slate-600 mt-1">
+						Local model ran entirely in your browser. Zero data sent. Zero cost.
 					</p>
 				</div>
 			{/if}
