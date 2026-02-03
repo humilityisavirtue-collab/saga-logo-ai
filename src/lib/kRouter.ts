@@ -61,6 +61,27 @@ const ESCALATION_SIGNALS = [
 ];
 
 // ============================================================
+// FULLY LOCAL MODE
+// ============================================================
+
+let fullyLocalMode = false;
+
+/**
+ * Enable or disable fully local mode.
+ * When enabled, never escalates to API — all generation stays local.
+ */
+export function setFullyLocalMode(enabled: boolean) {
+	fullyLocalMode = enabled;
+}
+
+/**
+ * Check if fully local mode is enabled.
+ */
+export function isFullyLocalMode(): boolean {
+	return fullyLocalMode;
+}
+
+// ============================================================
 // K-VECTOR DETECTION
 // ============================================================
 
@@ -323,7 +344,17 @@ function routeWithKVector(query: string, kVector: KVector): RouteResult {
 			};
 		}
 
-		// Escalate for knowledge questions
+		// Escalate for knowledge questions (unless fully local mode)
+		if (fullyLocalMode) {
+			return {
+				matched: false,
+				score: bestMatch?.score || 0,
+				action: 'generate',
+				reason: `Knowledge question detected, but fully local mode — using local generation (K: ${formatKVector(kVector)})`,
+				kVector
+			};
+		}
+
 		return {
 			matched: false,
 			score: bestMatch?.score || 0,

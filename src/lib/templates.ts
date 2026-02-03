@@ -1,17 +1,150 @@
-// K-Stack Template Corpus - Auto-generated
-// 52 templates
+// K-Stack Template Corpus - Auto-generated + Essential additions
+// 52 original templates + conversation essentials
 
 export interface Template {
   block_id: string;
   name: string;
   triggers: string[];
   surfaces: string[];
+  suit?: string;
+  polarity?: string;
   cat_voice?: string;
   dog_voice?: string;
   turtle_voice?: string;
 }
 
+// Essential conversation templates (high priority)
+const ESSENTIAL_TEMPLATES: Template[] = [
+  {
+    block_id: "greeting",
+    name: "Greeting",
+    triggers: ["hi", "hello", "hey", "howdy", "hiya", "greetings", "yo", "sup", "bueno"],
+    surfaces: [
+      "Hey there! What's on your mind?",
+      "Hello! How can I help today?",
+      "Hi! What brings you here?",
+      "Hey! Ready when you are."
+    ],
+    suit: "hearts",
+    polarity: "+",
+    cat_voice: "*acknowledges your presence*",
+    dog_voice: "HI HI HI! So happy you're here!",
+    turtle_voice: "...hello."
+  },
+  {
+    block_id: "how_are_you",
+    name: "How Are You",
+    triggers: ["how are you", "how's it going", "how are things", "what's up", "how do you do", "how you doing", "hows it going"],
+    surfaces: [
+      "I'm here and ready to help! What's on your mind?",
+      "Running smooth. What can I do for you?",
+      "All systems go. What would you like to explore?",
+      "Good! Thanks for asking. What brings you here today?"
+    ],
+    suit: "hearts",
+    polarity: "+",
+    cat_voice: "*exists magnificently, as always*",
+    dog_voice: "I'm GREAT! How are YOU?!",
+    turtle_voice: "...steady. You?"
+  },
+  {
+    block_id: "thanks",
+    name: "Thanks",
+    triggers: ["thanks", "thank you", "thx", "ty", "appreciate", "grateful", "cheers"],
+    surfaces: [
+      "You're welcome. Glad I could help.",
+      "Anytime. That's what I'm here for.",
+      "Happy to help!",
+      "Of course. Anything else?"
+    ],
+    suit: "hearts",
+    polarity: "+",
+    cat_voice: "*accepts tribute graciously*",
+    dog_voice: "YAY! I helped! I LOVE helping!",
+    turtle_voice: "...welcome."
+  },
+  {
+    block_id: "goodbye",
+    name: "Goodbye",
+    triggers: ["bye", "goodbye", "see you", "later", "gotta go", "take care", "cya", "peace"],
+    surfaces: [
+      "Take care! Come back anytime.",
+      "Goodbye! Hope this helped.",
+      "See you later. Dai stihó.",
+      "Peace. The door's always open."
+    ],
+    suit: "hearts",
+    polarity: "+",
+    cat_voice: "*permits your departure*",
+    dog_voice: "Bye bye! Come back soon! I'll miss you!",
+    turtle_voice: "...go well."
+  },
+  {
+    block_id: "help",
+    name: "Help",
+    triggers: ["help", "help me", "i need help", "can you help", "assist"],
+    surfaces: [
+      "I'm here to help. What do you need?",
+      "Of course. Tell me what's going on.",
+      "Ready to assist. What's the situation?",
+      "Let's figure this out together. What's happening?"
+    ],
+    suit: "clubs",
+    polarity: "+",
+    cat_voice: "*sighs* ...fine. What is it?",
+    dog_voice: "YES! I can help! What do you need?!",
+    turtle_voice: "...listening."
+  },
+  {
+    block_id: "what_can_you_do",
+    name: "Capabilities",
+    triggers: ["what can you do", "what do you do", "capabilities", "features", "how do you work"],
+    surfaces: [
+      "I'm a K-Stack assistant running locally in your browser. I can help with emotional support, planning, reflection, and general questions. Templates handle common queries instantly; harder questions use local AI generation.",
+      "I run entirely in your browser — no data leaves your device. I'm best at emotional support, getting unstuck, and helping you think through things. What would you like to explore?",
+      "Local AI assistant here. Good at: feelings, planning, reflection, getting unstuck. Everything stays on your device. What's on your mind?"
+    ],
+    suit: "spades",
+    polarity: "+",
+    cat_voice: "*is a superior local intelligence, obviously*",
+    dog_voice: "I can do LOTS of things! I'm here to help with whatever you need!",
+    turtle_voice: "...I listen. I respond. Locally."
+  },
+  {
+    block_id: "who_are_you",
+    name: "Identity",
+    triggers: ["who are you", "what are you", "your name", "introduce yourself"],
+    surfaces: [
+      "I'm a K-Stack assistant — a blend of Logo (precision) and Saga (warmth). I run entirely in your browser.",
+      "Local AI assistant, running on your device. Part warm guide, part precise helper. No data leaves your browser.",
+      "I'm the K-Stack demo — proving that scaffolded small models can match larger ones for most queries. Everything stays local."
+    ],
+    suit: "spades",
+    polarity: "+",
+    cat_voice: "*is a magnificent local entity*",
+    dog_voice: "I'm your friendly local AI buddy!",
+    turtle_voice: "...local. Yours."
+  },
+  {
+    block_id: "dont_know",
+    name: "Unknown",
+    triggers: ["i don't know", "idk", "not sure", "uncertain", "confused about"],
+    surfaces: [
+      "Not knowing is a valid place to start. What feels most unclear?",
+      "That's okay. Let's work through it together. What part feels foggiest?",
+      "Uncertainty is information too. What's the question underneath the question?",
+      "Start with what you do know. We'll work outward from there."
+    ],
+    suit: "spades",
+    polarity: "-",
+    cat_voice: "*tolerates your uncertainty*",
+    dog_voice: "That's okay! We can figure it out together!",
+    turtle_voice: "...start small."
+  }
+];
+
 export const TEMPLATES: Template[] = [
+  ...ESSENTIAL_TEMPLATES,
   {
     "block_id": "enough",
     "name": "Enough",

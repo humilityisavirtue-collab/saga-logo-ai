@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { settings } from '$lib/stores/settings';
 	import { localAI, LOCAL_MODELS, type LocalModelKey } from '$lib/localAI';
-	import { routeAsync, addToHistory, clearHistory, formatKVector, usedSemanticLens, type KVector, type RouteResult } from '$lib/kRouter';
+	import { routeAsync, addToHistory, clearHistory, formatKVector, usedSemanticLens, setFullyLocalMode, isFullyLocalMode, type KVector, type RouteResult } from '$lib/kRouter';
 	import { kLens } from '$lib/kLens';
 
 	// State
@@ -12,6 +12,18 @@
 	let apiKey = $state('');
 	let showKeyModal = $state(false);
 	let tempKey = $state('');
+
+	// Fully local mode - no API calls ever
+	let fullyLocal = $state(false);
+
+	function toggleFullyLocal() {
+		fullyLocal = !fullyLocal;
+		setFullyLocalMode(fullyLocal);
+		// Switch to Phi-3.5 for better quality in fully local mode
+		if (fullyLocal && aiState.selectedModel !== 'phi-3.5-mini') {
+			localAI.setModel('phi-3.5-mini');
+		}
+	}
 
 	// K-Lens state
 	let kLensState = $state({ available: true, loading: false, ready: false, progress: '', error: null as string | null });
@@ -98,8 +110,8 @@
 	async function sendMessage() {
 		if (!input.trim() || loading) return;
 
-		// Need API key for Opus side (and escalation)
-		if (!apiKey) {
+		// Need API key for Opus side (and escalation) unless fully local
+		if (!fullyLocal && !apiKey) {
 			showKeyModal = true;
 			return;
 		}
@@ -375,13 +387,22 @@
 				<span class="text-emerald-400">K</span>-Stack Demo
 			</h1>
 			<span class="text-xs text-slate-500 hidden md:inline">
-				Template → Local → API (escalation)
+				{fullyLocal ? 'Fully Local — No API' : 'Template → Local → API'}
 			</span>
 		</div>
 
 		<div class="flex items-center gap-4">
+			<!-- Fully Local Toggle -->
+			<button
+				onclick={toggleFullyLocal}
+				class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors {fullyLocal ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 border border-white/10 hover:border-white/20'}"
+			>
+				<span class="text-lg">{fullyLocal ? '🔒' : '☁️'}</span>
+				<span class="hidden sm:inline">{fullyLocal ? 'Fully Local' : 'API Enabled'}</span>
+			</button>
+
 			{#if !revealed}
-				<span class="text-sm text-slate-400">Blind mode: which is which?</span>
+				<span class="text-sm text-slate-400 hidden md:inline">Blind mode</span>
 				<button
 					onclick={reveal}
 					class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-medium rounded-lg transition-colors"
@@ -631,16 +652,25 @@
 				{@const localStats = localIsA ? statsA : statsB}
 				{@const opusStats = localIsA ? statsB : statsA}
 				<div class="border-t border-white/10 p-4 text-center space-y-2">
-					<p class="text-sm text-slate-400">
-						Same conversation.
-						<span class="{localStats.cost === 0 ? 'text-emerald-400' : 'text-amber-400'} font-bold">
-							K-Stack: ${formatCost(localStats.cost)}
-						</span> vs
-						<span class="text-rose-400 font-bold">Opus: ${formatCost(opusStats.cost)}</span>
-						<span class="text-slate-500 ml-2">
-							({formatTokens(opusStats.tokens)} tokens burned)
-						</span>
-					</p>
+					{#if fullyLocal}
+						<p class="text-sm text-emerald-400 font-bold">
+							🔒 FULLY LOCAL — No data left your browser
+						</p>
+						<p class="text-xs text-slate-400">
+							{localStats.queries} queries · {localStats.templates} templates · {localStats.queries - localStats.templates} local gen · $0.00 forever
+						</p>
+					{:else}
+						<p class="text-sm text-slate-400">
+							Same conversation.
+							<span class="{localStats.cost === 0 ? 'text-emerald-400' : 'text-amber-400'} font-bold">
+								K-Stack: ${formatCost(localStats.cost)}
+							</span> vs
+							<span class="text-rose-400 font-bold">Opus: ${formatCost(opusStats.cost)}</span>
+							<span class="text-slate-500 ml-2">
+								({formatTokens(opusStats.tokens)} tokens burned)
+							</span>
+						</p>
+					{/if}
 
 					<!-- Breakdown -->
 					<div class="flex justify-center gap-6 text-xs">
@@ -649,7 +679,7 @@
 								📚 {localStats.templates} templates ($0)
 							</span>
 						{/if}
-						{#if localStats.escalations > 0}
+						{#if !fullyLocal && localStats.escalations > 0}
 							<span class="text-amber-400">
 								☁️ {localStats.escalations} escalated (Sonnet)
 							</span>
@@ -662,7 +692,7 @@
 					</div>
 
 					<p class="text-xs text-slate-600 mt-1">
-						K-Stack: Templates first (free) → Local model (free) → Escalate to Sonnet (cheap)
+						{fullyLocal ? 'Everything runs on your device. Privacy preserved.' : 'K-Stack: Templates first (free) → Local model (free) → Escalate to Sonnet (cheap)'}
 					</p>
 				</div>
 			{/if}
