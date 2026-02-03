@@ -252,7 +252,39 @@ export function route(query: string): RouteResult {
 
 	// Step 4: Decide action
 
-	// High-confidence template match
+	// IMPORTANT: Escalation takes priority over weak template matches
+	// Knowledge questions should not return random templates
+	if (needsEscalation) {
+		// Only use template if it's VERY high confidence (score >= 5) AND directly relevant
+		// Otherwise escalate to get accurate knowledge
+		if (bestMatch && bestMatch.score >= 5) {
+			const surfaces = bestMatch.template.surfaces || [];
+			const surface = surfaces.length > 0
+				? surfaces[Math.floor(Math.random() * surfaces.length)]
+				: '[No surface available]';
+
+			return {
+				matched: true,
+				template: bestMatch.template,
+				surface,
+				score: bestMatch.score,
+				action: 'template',
+				reason: `High-confidence template despite escalation signal (score: ${bestMatch.score}, K: ${formatKVector(kVector)})`,
+				kVector
+			};
+		}
+
+		// Escalate for knowledge questions
+		return {
+			matched: false,
+			score: bestMatch?.score || 0,
+			action: 'escalate',
+			reason: `Knowledge question detected, escalating (K: ${formatKVector(kVector)})`,
+			kVector
+		};
+	}
+
+	// High-confidence template match (no escalation needed)
 	if (bestMatch && bestMatch.score >= 3) {
 		const surfaces = bestMatch.template.surfaces || [];
 		const surface = surfaces.length > 0
@@ -270,8 +302,8 @@ export function route(query: string): RouteResult {
 		};
 	}
 
-	// Lower-confidence match but no escalation needed
-	if (bestMatch && bestMatch.score >= 2 && !needsEscalation) {
+	// Lower-confidence match
+	if (bestMatch && bestMatch.score >= 2) {
 		const surfaces = bestMatch.template.surfaces || [];
 		const surface = surfaces.length > 0
 			? surfaces[Math.floor(Math.random() * surfaces.length)]
@@ -284,17 +316,6 @@ export function route(query: string): RouteResult {
 			score: bestMatch.score,
 			action: 'template',
 			reason: `Matched "${bestMatch.template.name}" (score: ${bestMatch.score}, K: ${formatKVector(kVector)})`,
-			kVector
-		};
-	}
-
-	// Needs knowledge — escalate to Claude API
-	if (needsEscalation) {
-		return {
-			matched: false,
-			score: bestMatch?.score || 0,
-			action: 'escalate',
-			reason: `Knowledge question detected, escalating (K: ${formatKVector(kVector)})`,
 			kVector
 		};
 	}
