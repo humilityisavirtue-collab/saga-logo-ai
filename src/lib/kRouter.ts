@@ -3,6 +3,11 @@
 // The scaffold does the knowing, the model does the speaking
 
 import { TEMPLATES, type Template } from './templates';
+import { kLens } from './kLens';
+
+// Flag to track if we're using semantic K-lens or keyword fallback
+let useSemanticLens = false;
+let semanticLensChecked = false;
 
 // ============================================================
 // K-LENS LITE: Browser-based suit/polarity detection
@@ -68,10 +73,36 @@ export interface KVector {
 }
 
 /**
- * Detect K-vector from query text.
+ * Detect K-vector using semantic K-lens (async version).
+ * Falls back to keyword detection if K-lens not ready.
+ */
+export async function detectKVectorSemantic(query: string): Promise<KVector> {
+	// Try semantic K-lens first
+	if (kLens.isReady()) {
+		const result = await kLens.detectKVector(query);
+		if (result) {
+			useSemanticLens = true;
+			return result;
+		}
+	}
+
+	// Fall back to keyword detection
+	useSemanticLens = false;
+	return detectKVectorKeywords(query);
+}
+
+/**
+ * Check if last detection used semantic K-lens or keyword fallback.
+ */
+export function usedSemanticLens(): boolean {
+	return useSemanticLens;
+}
+
+/**
+ * Detect K-vector from query text using keywords (sync fallback).
  * Returns suit (H/S/D/C) and polarity (+/-) with confidence scores.
  */
-export function detectKVector(query: string): KVector {
+export function detectKVectorKeywords(query: string): KVector {
 	const words = query.toLowerCase().split(/\s+/);
 	const wordSet = new Set(words);
 
@@ -193,23 +224,41 @@ export function getRecentContext(): string {
 // MAIN ROUTING FUNCTION
 // ============================================================
 
+// Sync alias for keyword-based detection (backwards compatibility)
+export function detectKVector(query: string): KVector {
+	return detectKVectorKeywords(query);
+}
+
 /**
- * Route a query through the K-Stack.
- * 1. Detect K-vector (suit/polarity)
+ * Route a query through the K-Stack (async version with semantic K-lens).
+ * 1. Detect K-vector (suit/polarity) using semantic embeddings
  * 2. Match against templates with K-vector boosting
  * 3. Return template, generate signal, or escalate signal
  */
+export async function routeAsync(query: string): Promise<RouteResult> {
+	const kVector = await detectKVectorSemantic(query);
+	return routeWithKVector(query, kVector);
+}
+
+/**
+ * Route a query through the K-Stack (sync version with keyword fallback).
+ */
 export function route(query: string): RouteResult {
+	const kVector = detectKVectorKeywords(query);
+	return routeWithKVector(query, kVector);
+}
+
+/**
+ * Internal routing logic with a pre-computed K-vector.
+ */
+function routeWithKVector(query: string, kVector: KVector): RouteResult {
 	const queryLower = query.toLowerCase();
 	const queryWords = new Set(queryLower.split(/\s+/));
 
-	// Step 1: Detect K-vector
-	const kVector = detectKVector(query);
-
-	// Step 2: Check for escalation signals first
+	// Check for escalation signals first
 	const needsEscalation = ESCALATION_SIGNALS.some(sig => queryLower.includes(sig));
 
-	// Step 3: Score templates with K-vector boosting
+	// Score templates with K-vector boosting
 	let bestMatch: { template: Template; score: number } | null = null;
 
 	for (const template of TEMPLATES) {

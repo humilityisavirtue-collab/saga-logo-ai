@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { settings } from '$lib/stores/settings';
 	import { localAI, LOCAL_MODELS, type LocalModelKey } from '$lib/localAI';
-	import { route, addToHistory, clearHistory, formatKVector, type KVector, type RouteResult } from '$lib/kRouter';
+	import { routeAsync, addToHistory, clearHistory, formatKVector, usedSemanticLens, type KVector, type RouteResult } from '$lib/kRouter';
+	import { kLens } from '$lib/kLens';
 
 	// State
 	let input = $state('');
@@ -11,6 +12,14 @@
 	let apiKey = $state('');
 	let showKeyModal = $state(false);
 	let tempKey = $state('');
+
+	// K-Lens state
+	let kLensState = $state({ available: true, loading: false, ready: false, progress: '', error: null as string | null });
+	let usingSemantic = $state(false);
+	$effect(() => {
+		const unsub = kLens.subscribe(s => { kLensState = s; });
+		return unsub;
+	});
 
 	// Messages for each side
 	let messagesA: Array<{role: string, content: string}> = $state([]);
@@ -53,7 +62,14 @@
 		// Check WebGPU availability on mount
 		await localAI.checkAvailability();
 		clearHistory(); // Fresh start
+
+		// Initialize semantic K-lens in background
+		kLens.initialize();
 	});
+
+	async function loadKLens() {
+		await kLens.initialize();
+	}
 
 	function saveApiKey() {
 		if (tempKey.trim()) {
@@ -176,10 +192,11 @@
 	}> {
 		const start = performance.now();
 
-		// K-Stack: Route first
-		const routeResult = route(message);
+		// K-Stack: Route first (uses semantic K-lens if available)
+		const routeResult = await routeAsync(message);
 		lastRouteResult = routeResult;
 		lastKVector = routeResult.kVector || null;
+		usingSemantic = usedSemanticLens();
 
 		// Template hit — instant, free
 		if (routeResult.action === 'template' && routeResult.surface) {
@@ -430,16 +447,52 @@
 		</div>
 	{/if}
 
+	<!-- K-Lens Status Bar -->
+	{#if !kLensState.ready}
+		<div class="px-4 py-2 bg-purple-900/20 border-b border-purple-500/20">
+			{#if kLensState.loading}
+				<div class="flex items-center justify-center gap-2 text-xs">
+					<span class="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+					<span class="text-purple-400">{kLensState.progress || 'Loading K-lens...'}</span>
+				</div>
+			{:else}
+				<div class="flex items-center justify-between text-xs">
+					<span class="text-slate-400">
+						🧠 Semantic K-lens not loaded — using keyword fallback
+					</span>
+					<button
+						onclick={loadKLens}
+						class="px-3 py-1 bg-purple-500 hover:bg-purple-400 text-black font-medium rounded transition-colors"
+					>
+						Load K-Lens (~25MB)
+					</button>
+				</div>
+			{/if}
+		</div>
+	{:else}
+		<div class="px-4 py-1 bg-purple-500/10 border-b border-purple-500/20">
+			<div class="flex items-center justify-center gap-2 text-xs">
+				<span class="w-2 h-2 bg-purple-500 rounded-full"></span>
+				<span class="text-purple-400">Semantic K-lens active</span>
+				<span class="text-slate-500">— neural routing enabled</span>
+			</div>
+		</div>
+	{/if}
+
 	<!-- K-Vector Display (when revealed) -->
 	{#if revealed && lastKVector}
 		<div class="px-4 py-2 bg-slate-900/50 border-b border-white/5 flex items-center justify-center gap-4 text-xs">
-			<span class="text-slate-500">Last query K-vector:</span>
+			<span class="text-slate-500">K-vector:</span>
 			<span class="font-mono text-amber-400">
 				{getSuitEmoji(lastKVector.suit)} {formatKVector(lastKVector)}
 			</span>
 			<span class="text-slate-600">|</span>
 			<span class="text-slate-400">
 				{lastKVector.suit} ({lastKVector.polarity})
+			</span>
+			<span class="text-slate-600">|</span>
+			<span class="{usingSemantic ? 'text-purple-400' : 'text-slate-500'}">
+				{usingSemantic ? '🧠 Semantic' : '🔤 Keywords'}
 			</span>
 			{#if lastRouteResult}
 				<span class="text-slate-600">|</span>
