@@ -48,27 +48,42 @@
 		}
 	}
 
+	// Kit's emails - recognized as secured
+	const KIT_EMAILS = ['humilityisavirtue@gmail.com', 'kit@ksystems.ai'];
+
 	function submitEmail() {
 		const email = emailInput.trim().toLowerCase();
 		if (!email || !email.includes('@')) return;
+
+		const isKit = KIT_EMAILS.includes(email);
 
 		// Log the email visit
 		const emailVisits = JSON.parse(localStorage.getItem('triv-email-visits') || '[]');
 		emailVisits.push({
 			email,
+			isKit,
 			timestamp: new Date().toISOString(),
 			ua: navigator.userAgent.slice(0, 100)
 		});
 		localStorage.setItem('triv-email-visits', JSON.stringify(emailVisits.slice(-100)));
 
 		// Mark as unlocked via email
-		localStorage.setItem('triv-unlocked', 'email');
+		localStorage.setItem('triv-unlocked', isKit ? 'yip' : 'email');
 		localStorage.setItem('triv-visitor-email', email);
 		unlocked = true;
 
-		// Skip heavy detection, go straight to chat
-		visitorProfile = { tier: 0, isSecured: false, flags: ['email-login'], email };
-		challengeStep = 'chat';
+		if (isKit) {
+			// Kit gets full secured access
+			visitorProfile = { tier: 4, isSecured: true, flags: ['kit-email'], email };
+			challengeStep = 'welcome';
+			setTimeout(() => {
+				challengeStep = 'chat';
+			}, 1500);
+		} else {
+			// Regular visitor - straight to chat
+			visitorProfile = { tier: 0, isSecured: false, flags: ['email-login'], email };
+			challengeStep = 'chat';
+		}
 	}
 
 	function switchToPin() {
