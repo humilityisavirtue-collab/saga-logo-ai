@@ -25,6 +25,10 @@
 	let valuationPlan = $state('');
 	let visitorProfile = $state<any>(null);
 
+	// === EMAIL LOGIN (simpler path) ===
+	let emailInput = $state('');
+	let useEmailLogin = $state(true); // Default to email login for demos
+
 	// === DETECTION ===
 	interface VisitorProfile {
 		tier: number;
@@ -42,6 +46,37 @@
 			unlocked = true;
 			runDetection();
 		}
+	}
+
+	function submitEmail() {
+		const email = emailInput.trim().toLowerCase();
+		if (!email || !email.includes('@')) return;
+
+		// Log the email visit
+		const emailVisits = JSON.parse(localStorage.getItem('triv-email-visits') || '[]');
+		emailVisits.push({
+			email,
+			timestamp: new Date().toISOString(),
+			ua: navigator.userAgent.slice(0, 100)
+		});
+		localStorage.setItem('triv-email-visits', JSON.stringify(emailVisits.slice(-100)));
+
+		// Mark as unlocked via email
+		localStorage.setItem('triv-unlocked', 'email');
+		localStorage.setItem('triv-visitor-email', email);
+		unlocked = true;
+
+		// Skip heavy detection, go straight to chat
+		visitorProfile = { tier: 0, isSecured: false, flags: ['email-login'], email };
+		challengeStep = 'chat';
+	}
+
+	function switchToPin() {
+		useEmailLogin = false;
+	}
+
+	function switchToEmail() {
+		useEmailLogin = true;
 	}
 
 	async function runDetection() {
@@ -424,19 +459,47 @@
 	}
 </script>
 
-<!-- GATE 1: Pin -->
+<!-- GATE 1: Email or Pin -->
 {#if !unlocked}
-<div class="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
-	<div class="text-center">
+<div class="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-6">
+	<div class="text-center max-w-sm w-full">
 		<span class="text-6xl mb-6 block">🦊</span>
-		<input
-			type="text"
-			bind:value={pinInput}
-			onkeydown={(e) => e.key === 'Enter' && checkPin()}
-			placeholder="..."
-			class="bg-transparent border-b-2 border-[var(--gold)]/50 focus:border-[var(--gold)] text-center text-2xl tracking-widest w-32 outline-none text-[var(--gold)] placeholder-[var(--gold)]/30"
-			autofocus
-		/>
+
+		{#if useEmailLogin}
+			<!-- Email Login (default for demos) -->
+			<p class="text-[var(--gold)]/70 text-sm mb-4">Enter your email to meet the fox</p>
+			<input
+				type="email"
+				bind:value={emailInput}
+				onkeydown={(e) => e.key === 'Enter' && submitEmail()}
+				placeholder="you@example.com"
+				class="w-full bg-transparent border-b-2 border-[var(--gold)]/50 focus:border-[var(--gold)] text-center text-lg outline-none text-white placeholder-white/30 mb-4 pb-2"
+				autofocus
+			/>
+			<button
+				onclick={submitEmail}
+				disabled={!emailInput.trim() || !emailInput.includes('@')}
+				class="px-6 py-2 bg-[var(--gold)] text-black font-medium rounded-lg disabled:opacity-30 transition-all mb-4"
+			>
+				Enter
+			</button>
+			<p class="text-white/30 text-xs">
+				<button onclick={switchToPin} class="underline hover:text-white/50">Have a code?</button>
+			</p>
+		{:else}
+			<!-- Pin Login (for Kit) -->
+			<input
+				type="text"
+				bind:value={pinInput}
+				onkeydown={(e) => e.key === 'Enter' && checkPin()}
+				placeholder="..."
+				class="bg-transparent border-b-2 border-[var(--gold)]/50 focus:border-[var(--gold)] text-center text-2xl tracking-widest w-32 outline-none text-[var(--gold)] placeholder-[var(--gold)]/30"
+				autofocus
+			/>
+			<p class="text-white/30 text-xs mt-4">
+				<button onclick={switchToEmail} class="underline hover:text-white/50">Use email instead</button>
+			</p>
+		{/if}
 	</div>
 </div>
 
